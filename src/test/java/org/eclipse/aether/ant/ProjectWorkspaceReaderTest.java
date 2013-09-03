@@ -10,17 +10,19 @@
  *******************************************************************************/
 package org.eclipse.aether.ant;
 
-import static org.junit.Assert.*;
+import org.apache.tools.ant.Project;
+import org.eclipse.aether.ant.types.Pom;
+import org.eclipse.aether.artifact.Artifact;
+import org.eclipse.aether.artifact.DefaultArtifact;
+import org.junit.Before;
+import org.junit.Ignore;
+import org.junit.Test;
 
 import java.io.File;
 
-import org.apache.tools.ant.Project;
-import org.eclipse.aether.ant.ProjectWorkspaceReader;
-import org.eclipse.aether.ant.types.Pom;
-import org.junit.Before;
-import org.junit.Test;
-import org.eclipse.aether.artifact.Artifact;
-import org.eclipse.aether.artifact.DefaultArtifact;
+import static org.hamcrest.collection.IsCollectionWithSize.*;
+import static org.junit.Assert.*;
+import static org.junit.internal.matchers.IsCollectionContaining.*;
 
 public class ProjectWorkspaceReaderTest
 {
@@ -111,5 +113,43 @@ public class ProjectWorkspaceReaderTest
         reader.addArtifact( artifact );
 
         assertNull( reader.findArtifact( artifact( "test:test:jar:0.1-SNAPSHOT" ) ) );
+    }
+
+    @Test
+    public void testFindVersions()
+    {
+        assertThat( reader.findVersions( artifact( "test:test:pom:0.1-SNAPSHOT" ) ),
+                    hasSize( 0 ) );
+
+        Pom pom = new Pom();
+        pom.setProject( project );
+        pom.setFile( new File( "src/test/ant/dummy-pom.xml" ) );
+
+        reader.addPom( pom );
+
+        assertThat( reader.findVersions( artifact( "test:test:pom:0.1-SNAPSHOT" ) ),
+                    hasItems( "0.1-SNAPSHOT" ) );
+    }
+
+    @Test
+    public void testFindVersionsWithMultipleVersions()
+    {
+        assertThat( reader.findVersions( artifact( "test:test:pom:0.1-SNAPSHOT" ) ),
+                    hasSize(0));
+
+        Pom pom = new Pom();
+        pom.setProject( project );
+        pom.setFile( new File( "src/test/ant/dummy-pom.xml" ) );
+
+        reader.addPom( pom );
+
+        Pom pom2 = new Pom();
+        pom2.setProject( project );
+        pom2.setFile( new File( "src/test/ant/dummy-pom-0.2-SNAPSHOT.xml" ) );
+
+        reader.addPom( pom2 );
+
+        assertThat( reader.findVersions( artifact( "test:test:pom:0.1-SNAPSHOT" ) ),
+                    hasItems( "0.1-SNAPSHOT", "0.2-SNAPSHOT" ) );
     }
 }

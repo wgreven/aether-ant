@@ -17,18 +17,25 @@ import org.apache.tools.ant.Project;
 import org.eclipse.aether.ant.ProjectWorkspaceReader;
 import org.eclipse.aether.artifact.Artifact;
 import org.eclipse.aether.artifact.DefaultArtifact;
+import org.eclipse.aether.internal.test.util.TestFileUtils;
 
 public class ReactorTest
     extends AntBuildsTest
 {
 
     private File pomDir;
+    private File distRepoPath;
 
     @Override
     protected void setUp()
         throws Exception
     {
         super.setUp();
+
+        distRepoPath = new File( "target/dist-repo" );
+        System.setProperty( "project.distrepo.url", distRepoPath.toURI().toString() );
+        TestFileUtils.deleteFile( distRepoPath );
+
         pomDir = new File( "src/test/ant/reactor" ).getAbsoluteFile();
         configureProject( "src/test/ant/Reactor.xml", Project.MSG_VERBOSE );
     }
@@ -87,6 +94,14 @@ public class ReactorTest
         throws IOException
     {
         executeTarget( "testResolveArtifact" );
+        String prop = project.getProperty( "resolve.test:test:jar" );
+        assertEquals( new File( "src/test/ant/reactor/pom1.xml" ).getAbsolutePath(), prop );
+    }
+
+    public void testResolveArtifactThatIsAlreadyDeployed()
+        throws IOException
+    {
+        executeTarget( "testResolveArtifactThatIsAlreadyDeployed" );
         String prop = project.getProperty( "resolve.test:test:jar" );
         assertEquals( new File( "src/test/ant/reactor/pom1.xml" ).getAbsolutePath(), prop );
     }

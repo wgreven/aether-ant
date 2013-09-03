@@ -11,10 +11,7 @@
 package org.eclipse.aether.ant;
 
 import java.io.File;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 import org.apache.maven.model.Model;
 import org.eclipse.aether.ant.types.Pom;
@@ -22,6 +19,7 @@ import org.eclipse.aether.artifact.Artifact;
 import org.eclipse.aether.artifact.DefaultArtifact;
 import org.eclipse.aether.repository.WorkspaceReader;
 import org.eclipse.aether.repository.WorkspaceRepository;
+import org.eclipse.aether.util.artifact.ArtifactIdUtils;
 
 /**
  * Workspace reader caching available POMs and artifacts for ant builds.
@@ -38,15 +36,16 @@ public class ProjectWorkspaceReader
 
     private static Object lock = new Object();
 
-    private Map<String, File> artifacts = Collections.synchronizedMap( new HashMap<String, File>() );
+    private Map<String, Artifact> artifacts = Collections.synchronizedMap( new HashMap<String, Artifact>() );
 
     public void addPom( Pom pom )
     {
         if ( pom.getFile() != null )
         {
             Model model = pom.getModel( pom );
-            String coords = coords( new DefaultArtifact( model.getGroupId(), model.getArtifactId(), null, "pom", model.getVersion() ) );
-            artifacts.put( coords, pom.getFile() );
+            Artifact aetherArtifact = new DefaultArtifact( model.getGroupId(), model.getArtifactId(), null,
+                                                           "pom", model.getVersion(), null, pom.getFile()  );
+            artifacts.put( ArtifactIdUtils.toId( aetherArtifact ), aetherArtifact );
         }
     }
 
@@ -54,39 +53,23 @@ public class ProjectWorkspaceReader
     {
         if ( artifact.getPom() != null )
         {
-            String coords;
-
             Pom pom = artifact.getPom();
-            DefaultArtifact aetherArtifact;
+            Artifact aetherArtifact;
             if ( pom.getFile() != null )
             {
                 Model model = pom.getModel( pom );
                 aetherArtifact =
                     new DefaultArtifact( model.getGroupId(), model.getArtifactId(), artifact.getClassifier(),
-                                             artifact.getType(),
-                                             model.getVersion() );
+                                         artifact.getType(), model.getVersion(), null, artifact.getFile() );
             }
             else
             {
                 aetherArtifact =
                     new DefaultArtifact( pom.getGroupId(), pom.getArtifactId(), artifact.getClassifier(),
-                                         artifact.getType(), pom.getVersion() );
+                                         artifact.getType(), pom.getVersion(), null, artifact.getFile() );
             }
-
-            coords = coords( aetherArtifact );
-            artifacts.put( coords, artifact.getFile() );
+            artifacts.put( ArtifactIdUtils.toId( aetherArtifact ), aetherArtifact );
         }
-    }
-
-    private String coords( Artifact artifact )
-    {
-        StringBuilder buffer = new StringBuilder( 128 );
-        buffer.append( artifact.getGroupId() );
-        buffer.append( ':' ).append( artifact.getArtifactId() );
-        buffer.append( ':' ).append( artifact.getExtension() );
-        buffer.append( ':' ).append( artifact.getClassifier() );
-        buffer.append( ':' ).append( artifact.getVersion() );
-        return buffer.toString();
     }
 
     public WorkspaceRepository getRepository()
@@ -96,12 +79,22 @@ public class ProjectWorkspaceReader
 
     public File findArtifact( Artifact artifact )
     {
-        return artifacts.get( coords( artifact ) );
+        Artifact projectArtifact = artifacts.get( ArtifactIdUtils.toId( artifact ) );
+        return projectArtifact == null ? null : projectArtifact.getFile();
     }
 
     public List<String> findVersions( Artifact artifact )
     {
-        return Collections.emptyList();
+        List<String> versions = new ArrayList<String>();
+        String versionlessId = ArtifactIdUtils.toVersionlessId( artifact );
+        for ( Artifact projectArtifact : artifacts.values() )
+        {
+            if ( versionlessId.equals( ArtifactIdUtils.toVersionlessId( projectArtifact )  ) )
+            {
+                versions.add( projectArtifact.getVersion() );
+            }
+        }
+        return versions;
     }
 
     ProjectWorkspaceReader()
